@@ -1,0 +1,8 @@
+# Format: targetNodeId|messageType|payload|delayMs
+# Lines starting with # are comments
+0|DataTransfer|hello-world|0
+1|StateQuery|get-status|500
+2|StateUpdate|set-value-42|1000
+3|Heartbeat|ping|1500
+0|DataTransfer|second-message|2000
+4|StateQuery|get-status|2500
