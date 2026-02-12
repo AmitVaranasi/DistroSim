@@ -55,19 +55,22 @@ object ExperimentRunner extends LazyLogging:
 
     // Step 6: Run algorithms
     logger.info("Step 6: Running algorithms...")
-    implicit val timeout: Timeout = Timeout(30.seconds)
+    implicit val timeout: Timeout = Timeout(60.seconds)
     val algorithmResults = expConfig.algorithmsToRun.flatMap { algName =>
       // For Dijkstra-Scholten, stop traffic first so termination can be detected
       if algName == "dijkstra-scholten" then
         logger.info("  Stopping traffic for termination detection...")
         actorGraph.timerNodes.foreach(_ ! StopSimulation)
         actorGraph.trafficGenerator.foreach(_ ! StopSimulation)
-        Thread.sleep(2000) // let in-flight messages drain
+        // Fixed drain time — traffic is lightweight, just need scheduled messages to complete
+        val drainMs = 5000L
+        logger.info(s"  Draining in-flight messages (${drainMs}ms)...")
+        Thread.sleep(drainMs)
 
       logger.info(s"  Running $algName...")
       Try {
         val future = actorGraph.algorithmManager ? RunAlgorithm(algName)
-        Await.result(future, 30.seconds) match
+        Await.result(future, 60.seconds) match
           case AlgorithmComplete(name, result: AlgorithmResult) =>
             logger.info(s"  $algName completed: ${result.summary}")
             Some(result)

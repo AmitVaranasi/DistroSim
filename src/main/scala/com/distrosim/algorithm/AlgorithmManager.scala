@@ -42,7 +42,7 @@ class AlgorithmManager(
           manager.start()
           // Set a timeout for termination detection
           import context.dispatcher
-          context.system.scheduler.scheduleOnce(15.seconds, self, "ds-timeout")
+          context.system.scheduler.scheduleOnce(45.seconds, self, "ds-timeout")
           log.info("Dijkstra-Scholten termination detection initiated")
 
         case other =>

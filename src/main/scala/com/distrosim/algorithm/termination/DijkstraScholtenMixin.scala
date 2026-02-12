@@ -51,12 +51,20 @@ class DijkstraScholtenMixin(nodeId: Int):
     if msg.computationId != computationId && !isInitiator then
       computationId = msg.computationId
 
+    if isInitiator then
+      // Initiator receives signals back from children — immediately ack them
+      // so their outgoing deficit can clear and they can ack their own parents
+      neighbors.get(msg.fromId).foreach { ref =>
+        ref ! DSAck(nodeId, computationId)
+      }
+      return
+
     incomingDeficit = incomingDeficit.updatedWith(msg.fromId) {
       case Some(d) => Some(d + 1)
       case None    => Some(1)
     }
 
-    if parent.isEmpty && !isInitiator then
+    if parent.isEmpty then
       // First activation: set parent
       parent = Some(msg.fromId)
       isActive = true
@@ -72,11 +80,10 @@ class DijkstraScholtenMixin(nodeId: Int):
       }
 
       // Node becomes passive after propagating
-      // (simulating: local computation is done)
       isActive = false
       tryAckParent(neighbors)
 
-    else if !isInitiator then
+    else
       // Already have a parent: immediately ack extra signals from non-parent
       if Some(msg.fromId) != parent then
         neighbors.get(msg.fromId).foreach { ref =>
@@ -116,14 +123,13 @@ class DijkstraScholtenMixin(nodeId: Int):
   private def tryAckParent(neighbors: Map[Int, ActorRef]): Unit =
     if !isActive && outgoingDeficit.isEmpty && !isInitiator then
       parent.foreach { parentId =>
-        // Send acks for all remaining incoming deficit from parent
+        // Send acks for ALL remaining incoming deficit from parent
         val parentDeficit = incomingDeficit.getOrElse(parentId, 0)
         if parentDeficit > 0 then
           neighbors.get(parentId).foreach { ref =>
-            ref ! DSAck(nodeId, computationId)
-            incomingDeficit = incomingDeficit.updatedWith(parentId) {
-              case Some(d) if d > 1 => Some(d - 1)
-              case _                => None
+            (0 until parentDeficit).foreach { _ =>
+              ref ! DSAck(nodeId, computationId)
             }
+            incomingDeficit = incomingDeficit.removed(parentId)
           }
       }

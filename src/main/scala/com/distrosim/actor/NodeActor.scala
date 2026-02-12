@@ -109,7 +109,27 @@ class NodeActor(
 
   def stopped: Receive =
     case GetState => sender() ! StateReport(nodeId, state)
-    case _ => // ignore all other messages
+
+    // Algorithm messages must still be handled even when stopped
+    case msg: DSInitiate =>
+      terminationMixin.initiate(msg.initiatorId, neighbors, self)
+    case msg: Signal =>
+      terminationMixin.handleSignal(msg, neighbors, self)
+    case msg: Ack =>
+      val terminated = terminationMixin.handleAck(msg, neighbors, self)
+      if terminated then
+        algorithmManager.foreach(_ ! TerminationDetected(nodeId, msg.computationId))
+    case msg: InitiateSnapshot =>
+      val completed = snapshotMixin.handleInitiate(msg, state, neighbors, self)
+      completed.foreach { recorded =>
+        algorithmManager.foreach(_ ! recorded)
+      }
+    case msg: Marker =>
+      val completed = snapshotMixin.handleMarker(msg, state, neighbors, self)
+      completed.foreach { recorded =>
+        algorithmManager.foreach(_ ! recorded)
+      }
+    case _ => // ignore application messages
 
   // === Core message handling ===
 
